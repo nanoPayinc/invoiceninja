@@ -105,7 +105,7 @@
 			@if ($invoice->id || $data)
 				</div>
 			@endif
-
+			
 			<div data-bind="with: client" class="invoice-contact">
 				<div style="display:none" class="form-group" data-bind="visible: contacts().length > 0 &amp;&amp; (contacts()[0].email() || contacts()[0].first_name()), foreach: contacts">
 					<div class="col-lg-8 col-lg-offset-4 col-sm-offset-4">
@@ -544,6 +544,7 @@
 		@elseif (!$invoice->trashed())
 			{!! Button::success(trans("texts.save_{$entityType}"))->withAttributes(array('id' => 'saveButton', 'onclick' => 'onSaveClick()'))->appendIcon(Icon::create('floppy-disk')) !!}
 		    {!! Button::info(trans("texts.email_{$entityType}"))->withAttributes(array('id' => 'emailButton', 'onclick' => 'onEmailClick()'))->appendIcon(Icon::create('send')) !!}
+				{!! Button::normal("Create Payment Message")->withAttributes(array('id' => 'iso20022', 'onclick' => 'onISOClick()')) !!}
             @if ($invoice->id)
                 {!! DropdownButton::normal(trans('texts.more_actions'))
                       ->withContents($actions)
@@ -553,6 +554,12 @@
 
 	</div>
 	<p>&nbsp;</p>
+	
+	<div class="panel panel-default" style="">
+		<div class="panel-body" id="isoPaymentMessage">
+				
+		</div>
+	</div>
 
 	@include('invoices.pdf', ['account' => Auth::user()->account])
 
@@ -1207,6 +1214,51 @@
 		var doc = generatePDF(invoice, design, true);
         var type = invoice.is_quote ? '{{ trans('texts.'.ENTITY_QUOTE) }}' : '{{ trans('texts.'.ENTITY_INVOICE) }}';
 		doc.save(type +'-' + $('#invoice_number').val() + '.pdf');
+	}
+	
+	function onISOClick() {
+		var taxRate = parseInt(model.invoice().tax1()) / 100;
+		var totalTax = (model.invoice().totals.rawTotal() * taxRate).toFixed(2);
+		var isoJSON = {
+			"amountDemiCents":model.invoice().totals.rawTotal() * 10000,
+			"currencyCode":1,
+			"isoMetadata":{
+				"invoiceHeader": {
+					"name":model.invoice().client().name()
+				},
+				"tradeSettlement": [
+					{
+						"monetarySummation": {
+							"taxTotalAmount":totalTax,
+							"taxTotalAmountCurrency":"CAN",
+							"taxBasisAmount":totalTax,
+							"taxBasisAmountCurrency":"CAN",
+							"grandTotalAmount":model.invoice().totals.rawTotal(),
+							"grandTotalAmountCurrency":"CAN"
+						}
+					}
+				],
+				"lineItems": [
+					{
+						"lineItem": {
+							"identification":"01",
+							"netPrice": 100,
+							"netPriceCurrency": "CAN" 
+						}
+					},
+					{
+						"lineItem": {
+							"identification":"02",
+							"netPrice": 150,
+							"netPriceCurrency": "CAN" 
+						}
+					} 
+				]
+			}
+		}
+			
+		console.log("SET payment message", isoJSON);
+		$('#isoPaymentMessage').text(JSON.stringify(isoJSON, null, '	'));
 	}
 
 	function onEmailClick() {
