@@ -555,7 +555,7 @@
 	</div>
 	<p>&nbsp;</p>
 	
-	<div class="panel panel-default" style="">
+	<div id="mintChipISO" class="panel panel-default" style="display:none">
 		<div class="panel-body">
 			<div id="mintChipPayload" style="display:none">
 				<h3>Payload</h3>
@@ -1236,12 +1236,13 @@
 	}
 	
 	function onISOClick() {
+		$('#mintChipISO').show();
 		var taxRate = parseInt(model.invoice().tax1()) / 100;
 		var totalTax = (model.invoice().totals.rawTotal() * taxRate).toFixed(2);
 		var accessToken;
 		
 		var isoJSON = {
-			"amountDemiCents":Math.round(model.invoice().totals.rawTotal()) * 10000,
+			"amountDemiCents":Math.round(model.invoice().totals.rawTotal() * 10000),
 			"currencyCode":1,
 			"isoMetadata":{
 				"invoiceHeader": {
@@ -1263,7 +1264,6 @@
 		}
 			
 		isoJSON.isoMetadata.lineItems = [];
-		console.log(model.invoice().invoice_items());
 		model.invoice().invoice_items().forEach(function(item) {
 			if (item.product_key() && item.cost()) {
 				isoJSON.isoMetadata.lineItems.push({
@@ -1279,7 +1279,6 @@
 			}
 		});
 		
-		console.log("SET payment message", isoJSON);
 		$('#isoPaymentMessage').text(JSON.stringify(isoJSON, null, '	'));
 		$('#mintChipPayload').show();
 		
@@ -1304,7 +1303,7 @@
 					},
 					success: function(vrm) {
 						console.log(vrm)
-						var apiTable = '<table class="table table-bordered"><tr><td><strong>VRM ID</strong></td><td>' + vrm.id + '</td></tr><tr><td><strong>Encoded</strong></td><td>' + vrm.iso20022 + '</td></tr><tr><td><strong>VRM</strong></td><td>' + vrm.vrmb64 + '</td></tr><tr><td><strong>XML</strong></td><td>' + escapeHtml(vrm.isoPaymentMessage) + '</td></tr></table>';
+						var apiTable = '<table class="table table-bordered"><tr><td><strong>VRM ID</strong></td><td>' + vrm.id + '</td></tr><tr><td><strong>Encoded ISO Message</strong></td><td>' + vrm.iso20022 + '</td></tr><tr><td><strong>VRM</strong></td><td>' + vrm.vrmb64 + '</td></tr><tr><td><strong>XML</strong></td><td>' + escapeHtml(vrm.isoPaymentMessage) + '</td></tr></table>';
 						$('#mintChipAPIResponse').html(apiTable);
 						$('#mintChipResponse').show();
 					}
