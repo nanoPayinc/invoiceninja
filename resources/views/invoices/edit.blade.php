@@ -556,8 +556,15 @@
 	<p>&nbsp;</p>
 	
 	<div class="panel panel-default" style="">
-		<div class="panel-body" id="isoPaymentMessage">
-				
+		<div class="panel-body">
+			<div id="mintChipPayload" style="display:none">
+				<h3>Payload</h3>
+				<div id="isoPaymentMessage"></div>
+			</div>
+			<div id="mintChipResponse" style="display:none">
+				<h3>Response</h3>
+				<div id="mintChipAPIResponse">Please wait&hellip;</div>
+			</div>
 		</div>
 	</div>
 
@@ -1216,11 +1223,25 @@
 		doc.save(type +'-' + $('#invoice_number').val() + '.pdf');
 	}
 	
+	function escapeHtml(text) {
+		var map = {
+			'&': '&amp;',
+			'<': '&lt;',
+			'>': '&gt;',
+			'"': '&quot;',
+			"'": '&#039;'
+		};
+
+		return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+	}
+	
 	function onISOClick() {
 		var taxRate = parseInt(model.invoice().tax1()) / 100;
 		var totalTax = (model.invoice().totals.rawTotal() * taxRate).toFixed(2);
+		var accessToken;
+		
 		var isoJSON = {
-			"amountDemiCents":model.invoice().totals.rawTotal() * 10000,
+			"amountDemiCents":Math.round(model.invoice().totals.rawTotal()) * 10000,
 			"currencyCode":1,
 			"isoMetadata":{
 				"invoiceHeader": {
@@ -1237,28 +1258,59 @@
 							"grandTotalAmountCurrency":"CAN"
 						}
 					}
-				],
-				"lineItems": [
-					{
-						"lineItem": {
-							"identification":"01",
-							"netPrice": 100,
-							"netPriceCurrency": "CAN" 
-						}
-					},
-					{
-						"lineItem": {
-							"identification":"02",
-							"netPrice": 150,
-							"netPriceCurrency": "CAN" 
-						}
-					} 
 				]
 			}
 		}
 			
+		isoJSON.isoMetadata.lineItems = [];
+		console.log(model.invoice().invoice_items());
+		model.invoice().invoice_items().forEach(function(item) {
+			if (item.product_key() && item.cost()) {
+				isoJSON.isoMetadata.lineItems.push({
+					"lineItem": {
+						"identification":item.product_key(),
+						"tradeProduct":{
+							"name":item.notes()
+						},
+						"netPrice":item.cost(),
+						"netPriceCurrency":"CAN"
+					}
+				})	
+			}
+		});
+		
 		console.log("SET payment message", isoJSON);
 		$('#isoPaymentMessage').text(JSON.stringify(isoJSON, null, '	'));
+		$('#mintChipPayload').show();
+		
+		$.ajax({
+			url: 'http://127.0.0.1:3002/api/users/login',
+			type: 'POST',
+			data: {
+				email:'joe.auty@nanopay.net',
+				password:'mintchip123',
+				realm:'mintchip'
+			},
+			success: function(result) {
+				accessToken = result.id; 
+				console.log(result);
+				
+				$.ajax({
+					url: 'http://127.0.0.1:3002/api/mintchip/createVrm',
+					type: 'POST',
+					data: isoJSON,
+					headers: {
+						authorization:accessToken
+					},
+					success: function(vrm) {
+						console.log(vrm)
+						var apiTable = '<table class="table table-bordered"><tr><td><strong>VRM ID</strong></td><td>' + vrm.id + '</td></tr><tr><td><strong>Encoded</strong></td><td>' + vrm.iso20022 + '</td></tr><tr><td><strong>VRM</strong></td><td>' + vrm.vrmb64 + '</td></tr><tr><td><strong>XML</strong></td><td>' + escapeHtml(vrm.isoPaymentMessage) + '</td></tr></table>';
+						$('#mintChipAPIResponse').html(apiTable);
+						$('#mintChipResponse').show();
+					}
+				});
+			}
+		});
 	}
 
 	function onEmailClick() {
